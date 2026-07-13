@@ -44,16 +44,19 @@ To run any of the agents or notebooks in this repository, follow these steps:
    git clone [https://github.com/yourusername/agentic-ai.git](https://github.com/yourusername/agentic-ai.git)
    cd agentic-ai
 2. Create a virtual environment:
-python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows use: venv\Scripts\activate
 
 3. Install the dependencies:
-pip install -r requirements.txt
+   ```bash
+   pip install -r requirements.txt
 
 4. Environment Variables: 
 Create a .env file in the root directory and add your API keys:
-OPENAI_API_KEY=your_openai_api_key_here
-# Add other keys as required by specific modules
+   
+   OPENAI_API_KEY=your_openai_api_key_here
+   # Add other keys as required by specific modules
 
 🛡️ License
 This project is for educational and portfolio purposes. Feel free to explore the code!
