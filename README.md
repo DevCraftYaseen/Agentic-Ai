@@ -55,8 +55,8 @@ To run any of the agents or notebooks in this repository, follow these steps:
 4. Environment Variables: 
 Create a .env file in the root directory and add your API keys:
    
-   OPENAI_API_KEY=your_openai_api_key_here
-   # Add other keys as required by specific modules
+OPENAI_API_KEY=your_openai_api_key_here
+# Add other keys as required by specific modules
 
 🛡️ License
 This project is for educational and portfolio purposes. Feel free to explore the code!
