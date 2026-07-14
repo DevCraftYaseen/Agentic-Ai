@@ -32,6 +32,8 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 18:** Engineered a mathematical reasoning agent for quadratic equations
 * **Day 19:** Developed a sentiment analysis node for text classification
 * **Day 20:** Built an automated X (Twitter) post generation and formatting agent
+* **Day 21:** Built a basic conversational chatbot using LangGraph
+* **Day 22** Added state persistence and memory to LangGraph agents
 
 ---
 
