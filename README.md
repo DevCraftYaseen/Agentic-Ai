@@ -36,6 +36,7 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 22** Added state persistence and memory to LangGraph agents
 * **Day 23** Developed a full-stack chatbot with a Streamlit UI and LangGraph backend
 * **Day 24** Implemented UI streaming and threading to support multiple active sidebar chats
+* **Day 25** Integrated SQLite database for persistent chatbot memory and state tracking
 
 ---
 
