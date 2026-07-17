@@ -1,11 +1,11 @@
 # Agentic AI: My Engineering Journey 🤖
 
-Documenting my practical journey as an AI Automation and Agents Engineer. This repository serves as my daily practice ground for coding, testing, and evolving autonomous AI workflows using LangChain and LangGraph. It is structured phase-by-phase, reflecting my progression from core concepts to complex, stateful agent architectures.
+Documenting my practical journey as an AI Automation and Agents Engineer. This repository serves as my daily practice ground for coding, testing, and evolving autonomous AI workflows. It tracks my progression from core LangChain concepts to building stateful LangGraph agents, ultimately culminating in a decoupled, real-time full-stack application.
 
 ## 👨‍💻 About the Developer
 Built by **Yaseen Khan (DevCraftYaseen)** 
 Full Stack Web Developer & AI Automation Engineer
-* **Tech Stack:** Python, LangChain, LangGraph, Large Language Models (LLMs), Vector Databases (Chroma), MERN, Next.js, and n8n.
+* **Tech Stack:** Python, LangChain, LangGraph, FastAPI, Next.js (App Router), React, SQLite, and Chroma.
 
 ---
 
@@ -32,36 +32,76 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 18:** Engineered a mathematical reasoning agent for quadratic equations
 * **Day 19:** Developed a sentiment analysis node for text classification
 * **Day 20:** Built an automated X (Twitter) post generation and formatting agent
+
+### Phase 3: Full-Stack AI Integration
 * **Day 21:** Built a basic conversational chatbot using LangGraph
-* **Day 22** Added state persistence and memory to LangGraph agents
-* **Day 23** Developed a full-stack chatbot with a Streamlit UI and LangGraph backend
-* **Day 24** Implemented UI streaming and threading to support multiple active sidebar chats
-* **Day 25** Integrated SQLite database for persistent chatbot memory and state tracking
+* **Day 22:** Added state persistence and memory to LangGraph agents
+* **Day 23:** Developed a chatbot with a Streamlit UI and LangGraph backend
+* **Day 24:** Implemented UI streaming and threading for multiple active sidebar chats
+* **Day 25:** Integrated SQLite database for persistent chatbot memory and state tracking
+* **Day 26:** Backend: Migrated LangGraph to FastAPI server with SSE, enabled Gemini token streaming, and resolved AIMessageChunk filtering bug
+* **Day 26:** Frontend: Built Next.js UI with ChatArea/Sidebar, integrated react-markdown, fixed React Strict Mode state mutations, and added UI/UX polish
 
 ---
 
 ## ⚙️ Local Setup & Installation
 
-To run any of the agents or notebooks in this repository, follow these steps:
+This project utilizes a decoupled full-stack architecture. You will need to run the backend and frontend simultaneously in separate terminal windows.
 
-1. **Clone the repository:**
-   ```bash
-   git clone [https://github.com/yourusername/agentic-ai.git](https://github.com/yourusername/agentic-ai.git)
-   cd agentic-ai
-2. Create a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows use: venv\Scripts\activate
+### 1. Clone the repository
+```bash
+git clone [https://github.com/yourusername/agentic-ai.git](https://github.com/yourusername/agentic-ai.git)
+cd agentic-ai
 
-3. Install the dependencies:
-   ```bash
-   pip install -r requirements.txt
+2. Start the FastAPI Backend
+```bash
+# Navigate to the backend directory
+cd Apps/Chatbot/backend
 
-4. Environment Variables: 
-Create a .env file in the root directory and add your API keys:
-   
-OPENAI_API_KEY=your_openai_api_key_here
-# Add other keys as required by specific modules
+# Create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set up your environment variables (create a .env file)
+# OPENAI_API_KEY=your_key_here
+# GEMINI_API_KEY=your_key_here
+
+# Run the FastAPI server
+uvicorn main:app --reload
+
+3. Start the Next.js Frontend
+```bash
+# Open a new terminal and navigate to the frontend directory
+cd Apps/Chatbot/frontend
+
+# Install dependencies
+npm install
+
+# Run the development server
+npm run dev
 
 🛡️ License
 This project is for educational and portfolio purposes. Feel free to explore the code!
+
+---
+
+### **Step 4: Stage and Push the Restructured App**
+Now that the nested Git folders are gone and the ignore rules are unified at the root, you can stage the files exactly how you wanted:
+
+```bash
+# Stage the consolidated gitignore and updated README
+git add .gitignore
+git add README.md
+
+# Stage the frontend and backend as standard directories
+git add Apps/Chatbot/backend/
+git add Apps/Chatbot/frontend/
+
+# Commit the massive full-stack migration
+git commit -m "Day 26: Migrated to a full-stack architecture with Next.js frontend, FastAPI backend, SSE token streaming, and a unified root git configuration"
+
+# Push to GitHub
+git push
