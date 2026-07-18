@@ -42,6 +42,9 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 26:** Backend: Migrated LangGraph to FastAPI server with SSE, enabled Gemini token streaming, and resolved AIMessageChunk filtering bug
 * **Day 26:** Frontend: Built Next.js UI with ChatArea/Sidebar, integrated react-markdown, fixed React Strict Mode state mutations, and added UI/UX polish
 
+### Phase 4: Observability & Evaluation
+* **Day 27:** Introduced LangSmith for application observability, successfully tracing simple LLM calls and sequential chains.
+
 ---
 
 ## ⚙️ Local Setup & Installation
