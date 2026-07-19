@@ -13,6 +13,7 @@ env/
 *.db
 *.sqlite3
 chroma_langchain_db/
+LangSmith/indices
 
 # =========================
 # Node & Frontend (Next.js, React)

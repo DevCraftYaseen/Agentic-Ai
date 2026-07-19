@@ -44,6 +44,7 @@ Full Stack Web Developer & AI Automation Engineer
 
 ### Phase 4: Observability & Evaluation
 * **Day 27:** Introduced LangSmith for application observability, successfully tracing simple LLM calls and sequential chains.
+* **Day 28:** Implemented and evaluated multiple iterations of Retrieval-Augmented Generation (RAG) architectures (v1-v4) using LangSmith tracing.
 
 ---
 
