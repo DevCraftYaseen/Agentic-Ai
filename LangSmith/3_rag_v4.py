@@ -19,6 +19,9 @@ from langchain_core.output_parsers import StrOutputParser
 
 load_dotenv()
 
+# Custom project name using code
+os.environ['LANGCHAIN_PROJECT'] = 'Rag V3'
+
 PDF_PATH = "./LangSmith/islr.pdf"  # change to your file
 INDEX_ROOT = Path("./LangSmith/indices")
 INDEX_ROOT.mkdir(exist_ok=True)

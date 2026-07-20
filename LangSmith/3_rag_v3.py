@@ -16,6 +16,9 @@ from langchain_core.output_parsers import StrOutputParser
 
 load_dotenv()
 
+# Custom project name using code
+os.environ['LANGCHAIN_PROJECT'] = 'Rag V2'
+
 PDF_PATH = "./LangSmith/islr.pdf"  # <- change to your file
 
 # ----------------- helpers (not traced individually) -----------------
