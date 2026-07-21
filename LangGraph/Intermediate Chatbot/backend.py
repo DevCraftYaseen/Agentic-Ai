@@ -6,8 +6,12 @@ from dotenv import load_dotenv
 from langchain_core.messages import BaseMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 import sqlite3
+import os
 
 load_dotenv()
+
+# Custom project name using code
+os.environ['LANGCHAIN_PROJECT'] = 'Langgraph chatbot'
 
 llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
 

@@ -3,10 +3,15 @@ from langgraph.graph.message import add_messages
 from typing import TypedDict, Annotated
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import BaseMessage
 from langgraph.checkpoint.memory import MemorySaver
+import os
 
 load_dotenv()
+
+# Custom project name using code
+os.environ['LANGCHAIN_PROJECT'] = 'Langgraph chatbot'
+
 
 llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
 
