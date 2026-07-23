@@ -47,6 +47,7 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 28:** Implemented and evaluated multiple iterations of Retrieval-Augmented Generation (RAG) architectures (v1-v4) using LangSmith tracing.
 * **Day 29:** Traced ReAct agent executions and stateful LangGraph workflows using LangSmith to monitor autonomous decision-making.
 * **Day 30:** Integrated LangSmith into the chatbot architectures, utilizing `thread_id` metadata to track and debug specific multi-turn conversational sessions.
+* **Day 31:** Upgraded the LangGraph chatbot into a tool-calling ReAct agent by integrating external APIs (Search, Calculator, and real-time Stock Prices).
 
 ---
 
