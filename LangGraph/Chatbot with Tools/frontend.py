@@ -91,6 +91,7 @@ if user_input:
     }
 
      # first add the message to message_history
+    # first add the message to message_history
     with st.chat_message("assistant"):
         def ai_only_stream():
             for message_chunk, metadata in chatbot.stream(
@@ -99,8 +100,17 @@ if user_input:
                 stream_mode="messages"
             ):
                 if isinstance(message_chunk, AIMessage):
-                    # yield only assistant tokens
-                    yield message_chunk.content
+                    content = message_chunk.content
+                    
+                    # 1. If the content is a standard string, yield it directly
+                    if isinstance(content, str) and content:
+                        yield content
+                        
+                    # 2. If the content is a list (Gemini's structured tool output), extract the text
+                    elif isinstance(content, list):
+                        for item in content:
+                            if isinstance(item, dict) and "text" in item:
+                                yield item["text"]
 
         ai_message = st.write_stream(ai_only_stream())
 

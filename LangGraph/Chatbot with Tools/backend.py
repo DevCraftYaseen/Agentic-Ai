@@ -2,9 +2,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, BaseMessage
 from langchain_core.tools import tool
+from langchain_core.tools import InjectedToolArg
 from langchain_community.tools import DuckDuckGoSearchRun
 from typing import TypedDict, Annotated
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import StateGraph, START
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.graph.message import add_messages
 import sqlite3
@@ -14,8 +15,9 @@ import os
 
 load_dotenv()
 
-# STOCK API Key 
+# API Keys 
 STOCK_API_KEY = os.getenv('STOCK_API_KEY')
+CURRENCY_CONVERTER_API = os.getenv('CURRENCY_CONVERTER_API')
 
 # Custom project name using code
 os.environ['LANGCHAIN_PROJECT'] = 'Chatbot with Tools'
@@ -60,7 +62,19 @@ def get_stock_price(symbol: str) -> dict:
     r = requests.get(url)
     return r.json()
 
-tools = [search_tool, get_stock_price, calculator]
+@tool
+def fetch_rate(base_curr: str, target_curr: str):
+    """This function fetches the currency conversion factor between a given base currency and a target currency."""
+    url = f"https://v6.exchangerate-api.com/v6/{CURRENCY_CONVERTER_API}/pair/{base_curr}/{target_curr}"
+    response = requests.get(url)
+    return response.json()
+
+@tool
+def convert(base_curr_value: int, conversion_rate: Annotated[float, InjectedToolArg]) -> float:
+    """Given the conversion rate, this function calculates the target currency value from a given base_currency_value"""
+    return base_curr_value * conversion_rate
+
+tools = [search_tool, get_stock_price, calculator, fetch_rate, convert]
 llm_with_tools = llm.bind_tools(tools)
 
 # 3. State

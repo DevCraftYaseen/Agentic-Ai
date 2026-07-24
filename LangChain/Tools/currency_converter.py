@@ -5,16 +5,18 @@ from langchain_core.tools import InjectedToolArg
 from dotenv import load_dotenv
 import requests
 from typing import Annotated
-import json
+import json, os
 
 load_dotenv()
+
+CURRENCY_CONVERTER_API = os.getenv('CURRENCY_CONVERTER_API')
 
 model = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
 
 @tool
 def fetch_rate(base_curr: str, target_curr: str):
     """This function fetches the currency conversion factor between a given base currency and a target currency."""
-    url = f"https://v6.exchangerate-api.com/v6/8f44bbca2aef5d1764f95b62/pair/{base_curr}/{target_curr}"
+    url = f"https://v6.exchangerate-api.com/v6/{CURRENCY_CONVERTER_API}/pair/{base_curr}/{target_curr}"
     response = requests.get(url)
     return response.json()
 
