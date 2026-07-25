@@ -60,6 +60,7 @@ This project utilizes a decoupled full-stack architecture. You will need to run 
 ```bash
 git clone [https://github.com/yourusername/agentic-ai.git](https://github.com/yourusername/agentic-ai.git)
 cd agentic-ai
+```
 
 2. Start the FastAPI Backend
 ```bash
@@ -79,6 +80,7 @@ pip install -r requirements.txt
 
 # Run the FastAPI server
 uvicorn main:app --reload
+```
 
 3. Start the Next.js Frontend
 ```bash
@@ -90,6 +92,7 @@ npm install
 
 # Run the development server
 npm run dev
+```
 
 🛡️ License
 This project is for educational and portfolio purposes. Feel free to explore the code!
@@ -113,3 +116,4 @@ git commit -m "Day 26: Migrated to a full-stack architecture with Next.js fronte
 
 # Push to GitHub
 git push
+```
