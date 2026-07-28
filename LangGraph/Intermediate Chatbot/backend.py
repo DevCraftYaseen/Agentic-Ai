@@ -2,6 +2,7 @@ from langgraph.graph import StateGraph , START, END
 from langgraph.graph.message import add_messages
 from typing import TypedDict, Annotated
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_ollama import ChatOllama
 from dotenv import load_dotenv
 from langchain_core.messages import BaseMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -11,9 +12,10 @@ import os
 load_dotenv()
 
 # Custom project name using code
-os.environ['LANGCHAIN_PROJECT'] = 'Langgraph chatbot'
+# os.environ['LANGCHAIN_PROJECT'] = 'Langgraph chatbot'
 
-llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
+# llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
+llm = ChatOllama(model='llama3:latest', base_url='http://localhost:11434')
 
 class ChatState(TypedDict):
     messages : Annotated[list[BaseMessage], add_messages]

@@ -49,6 +49,7 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 30:** Integrated LangSmith into the chatbot architectures, utilizing `thread_id` metadata to track and debug specific multi-turn conversational sessions.
 * **Day 31:** Upgraded the LangGraph chatbot into a tool-calling ReAct agent by integrating external APIs (Search, Calculator, and real-time Stock Prices).
 * **Day 32:** Expanded the agent's toolset with real-time currency exchange and conversion tools, and optimized the frontend for highly efficient token streaming.
+* **Day 33:** Learned the MCP Archietecture in detail for our upcoming feature of the chatbot.
 
 ---
 
