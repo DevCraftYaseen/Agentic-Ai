@@ -27,7 +27,15 @@ SERVERS = {
             "run",
             "D:\\MCP\\math-mcp-server\\src\\math_mcp_server\\__init__.py"
         ]
-    }
+    },
+    "expense-tracker": {
+        'transport': 'stdio',
+        "command": "fastmcp",
+        "args": [
+            "run",
+            "D:\\MCP\\demo-mcp\\src\\demo_mcp\\__init__.py"
+        ]
+    },
 }
 
 client = MultiServerMCPClient(SERVERS)
@@ -76,7 +84,7 @@ async def main():
 
     result = await chatbot.ainvoke(
         {
-            'messages': [HumanMessage(content = 'Find the modulus of 132345 and 23 and give answer like a cricker commentator.')] 
+            'messages': [HumanMessage(content = 'What are the credits and expenses of me for the month of August 2026.')] 
         },
         config={"configurable": {"thread_id": "1"}}
     )
