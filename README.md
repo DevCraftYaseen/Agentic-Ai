@@ -54,6 +54,8 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 34.2:** Added the math MCP server to the mcp_chatbot.
 * **Day 34.3:** Added expense tracker MCP tool to the mcp chatbot.
 * **Day 35:** Converted MCP chatbot to production-ready architecture with dedicated async event loop, AsyncSqliteSaver checkpointer, and Streamlit frontend; configured general-purpose AI assistant with intelligent tool routing for math operations and expense tracking.
+* **Day 36:** Built RAG-as-a-tool system with FAISS vector store, document retrieval, and LangGraph orchestration for intelligent context-based responses
+
 
 ---
 
