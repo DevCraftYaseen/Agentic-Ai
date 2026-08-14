@@ -1,5 +1,5 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_ollama import OllamaEmbeddings
+from langchain_ollama import OllamaEmbeddings, ChatOllama
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, BaseMessage, SystemMessage
 from langchain_core.tools import tool
@@ -22,6 +22,7 @@ load_dotenv()
 # 1. LLM Configuration
 # -------------------
 llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
+# llm = ChatOllama(model = 'qwen2.5-coder:7b')
 
 # -------------------
 # 2. RAG Components
@@ -29,8 +30,8 @@ llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
 
 # Embedding Model
 # Using v3.0 (the correct model name for Cohere)
-embedding_model = CohereEmbeddings(model="embed-english-v3.0")
-# embedding_model = OllamaEmbeddings(model = 'llama3')
+# embedding_model = CohereEmbeddings(model="embed-english-v3.0")
+embedding_model = OllamaEmbeddings(model = 'nomic-embed-text')
 
 # Text Splitter
 text_splitter = RecursiveCharacterTextSplitter(

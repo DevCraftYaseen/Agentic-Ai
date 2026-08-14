@@ -14,6 +14,7 @@ env/
 *.sqlite3
 chroma_langchain_db/
 LangSmith/indices
+RAG/faiss_index
 
 # =========================
 # Node & Frontend (Next.js, React)
