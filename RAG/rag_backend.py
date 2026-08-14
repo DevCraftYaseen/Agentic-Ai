@@ -60,9 +60,10 @@ text_splitter = RecursiveCharacterTextSplitter(
     separators=["\n\n", "\n", ". ", " ", ""]  # Smart splitting
 )
 
-# Storage paths
-UPLOAD_DIR = './RAG/uploads'
-VECTOR_STORE_PATH = './RAG/vector_store'
+# Storage paths - Use absolute paths to avoid nesting issues
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_DIR = os.path.join(BASE_DIR, 'uploads')
+VECTOR_STORE_PATH = os.path.join(BASE_DIR, 'vector_store')
 
 # Create directories if they don't exist
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -111,7 +112,7 @@ def load_pdf_file(file_path: str) -> List[Document]:
         return []
 
 
-def rebuild_vector_store(uploaded_files: List[str]) -> bool:
+def rebuild_vector_store(uploaded_files: List[str]) -> tuple[bool, str]:
     """
     Rebuild the vector store from all uploaded files.
     
@@ -119,7 +120,7 @@ def rebuild_vector_store(uploaded_files: List[str]) -> bool:
         uploaded_files: List of file paths to index
         
     Returns:
-        True if successful, False otherwise
+        (success: bool, message: str)
     """
     global vector_store, retriever
     
@@ -128,22 +129,31 @@ def rebuild_vector_store(uploaded_files: List[str]) -> bool:
             print("⚠️ No files to index")
             vector_store = None
             retriever = None
-            return False
+            return False, "No files to index"
         
         print(f"🔮 Building vector store from {len(uploaded_files)} file(s)...")
         
         all_chunks = []
+        failed_files = []
+        
         for file_path in uploaded_files:
             if os.path.exists(file_path):
                 chunks = load_pdf_file(file_path)
-                all_chunks.extend(chunks)
-                print(f"  ✅ Loaded {len(chunks)} chunks from {os.path.basename(file_path)}")
+                if chunks:
+                    all_chunks.extend(chunks)
+                    print(f"  ✅ Loaded {len(chunks)} chunks from {os.path.basename(file_path)}")
+                else:
+                    failed_files.append(os.path.basename(file_path))
+                    print(f"  ❌ Failed to load {os.path.basename(file_path)}")
         
         if not all_chunks:
-            print("❌ No chunks extracted from files")
+            error_msg = "Failed to extract text from PDF"
+            if failed_files:
+                error_msg += f": {', '.join(failed_files)}"
+            print(f"❌ {error_msg}")
             vector_store = None
             retriever = None
-            return False
+            return False, error_msg
         
         print(f"📊 Total chunks: {len(all_chunks)}")
         print("🔮 Creating embeddings...")
@@ -156,13 +166,14 @@ def rebuild_vector_store(uploaded_files: List[str]) -> bool:
         )
         
         print("✅ Vector store created successfully")
-        return True
+        return True, "Successfully indexed document"
     
     except Exception as e:
-        print(f"❌ Error building vector store: {e}")
+        error_msg = f"Indexing error: {str(e)}"
+        print(f"❌ {error_msg}")
         vector_store = None
         retriever = None
-        return False
+        return False, error_msg
 
 
 def get_uploaded_files() -> List[str]:
@@ -180,33 +191,81 @@ def get_uploaded_files() -> List[str]:
     return sorted(files)
 
 
-def add_file(file_path: str) -> bool:
+def add_file(file_path: str) -> tuple[bool, str]:
     """
     Add a new file to the RAG system.
-    """
-    uploaded_files = get_uploaded_files()
-    if file_path not in uploaded_files:
-        uploaded_files.append(file_path)
     
-    return rebuild_vector_store(uploaded_files)
-
-
-def remove_file(file_path: str) -> bool:
-    """
-    Remove a file from the RAG system.
+    Returns:
+        (success: bool, message: str)
     """
     try:
+        # Validate file exists
+        if not os.path.exists(file_path):
+            return False, f"File not found: {file_path}"
+        
+        # Try to build vector store with this file included
+        uploaded_files = get_uploaded_files()
+        if file_path not in uploaded_files:
+            uploaded_files.append(file_path)
+        
+        success, message = rebuild_vector_store(uploaded_files)
+        
+        if success:
+            return True, "File indexed successfully!"
+        else:
+            # Rollback: remove the file if indexing failed
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                    print(f"🔄 Rolled back: removed {os.path.basename(file_path)}")
+                except Exception as e:
+                    print(f"⚠️ Could not remove file during rollback: {e}")
+            return False, f"Failed to index: {message}"
+    
+    except Exception as e:
+        # Rollback on any error
         if os.path.exists(file_path):
-            os.remove(file_path)
-            print(f"🗑️ Removed file: {os.path.basename(file_path)}")
+            try:
+                os.remove(file_path)
+            except:
+                pass
+        return False, f"Error: {str(e)}"
+
+
+def remove_file(file_path: str) -> tuple[bool, str]:
+    """
+    Remove a file from the RAG system.
+    
+    Returns:
+        (success: bool, message: str)
+    """
+    try:
+        # Check if file exists
+        if not os.path.exists(file_path):
+            return False, f"File not found: {os.path.basename(file_path)}"
+        
+        # Delete the file
+        os.remove(file_path)
+        print(f"🗑️ Removed file: {os.path.basename(file_path)}")
         
         # Rebuild vector store with remaining files
         uploaded_files = get_uploaded_files()
-        return rebuild_vector_store(uploaded_files)
+        
+        if uploaded_files:
+            success, message = rebuild_vector_store(uploaded_files)
+            if success:
+                return True, f"Removed '{os.path.basename(file_path)}' successfully!"
+            else:
+                return True, f"Removed '{os.path.basename(file_path)}' but failed to rebuild index: {message}"
+        else:
+            # No files left
+            global vector_store, retriever
+            vector_store = None
+            retriever = None
+            return True, "All documents removed."
     
     except Exception as e:
-        print(f"❌ Error removing file: {e}")
-        return False
+        return False, f"Error removing file: {str(e)}"
 
 
 # -------------------
@@ -373,6 +432,8 @@ def retrieve_all_threads():
 uploaded_files = get_uploaded_files()
 if uploaded_files:
     print(f"📂 Found {len(uploaded_files)} existing file(s)")
-    rebuild_vector_store(uploaded_files)
+    success, message = rebuild_vector_store(uploaded_files)
+    if not success:
+        print(f"⚠️ Failed to load existing files: {message}")
 else:
     print("📂 No existing files found")

@@ -28,6 +28,11 @@ def generate_thread_id():
 
 
 def reset_chat():
+    """Reset chat only if current chat has messages"""
+    # Silently prevent creating new empty chat
+    if not st.session_state["message_history"]:
+        return  # Don't create new chat, don't show message
+    
     thread_id = generate_thread_id()
     st.session_state["thread_id"] = thread_id
     add_thread(thread_id)
@@ -48,11 +53,21 @@ def load_conversation(thread_id):
 def save_uploaded_file(uploaded_file):
     """Save uploaded file to the uploads directory."""
     try:
+        # Create uploads directory if it doesn't exist
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        
         file_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
         
         # Check if file already exists
         if os.path.exists(file_path):
-            return None, f"File '{uploaded_file.name}' already exists!"
+            return None, f"File '{uploaded_file.name}' already exists! Please delete it first or rename your file."
+        
+        # Validate file
+        if uploaded_file.size == 0:
+            return None, "File is empty (0 bytes)!"
+        
+        if uploaded_file.size > 50 * 1024 * 1024:  # 50MB
+            return None, f"File too large ({format_file_size(uploaded_file.size)})! Maximum size is 50MB."
         
         # Save the file
         with open(file_path, "wb") as f:
@@ -133,21 +148,27 @@ with st.sidebar:
     
     if uploaded_file is not None:
         if st.button("📤 Add to Knowledge Base", use_container_width=True):
-            with st.spinner("Uploading and indexing..."):
+            with st.spinner(f"Processing '{uploaded_file.name}'..."):
+                # Save file first
                 file_path, error = save_uploaded_file(uploaded_file)
                 
                 if error:
-                    st.error(error)
+                    st.error(f"❌ {error}")
                 else:
+                    # File saved successfully, now index it
+                    progress_text = st.empty()
+                    progress_text.info("📄 Indexing document...")
+                    
                     # Add file and rebuild vector store
-                    success = add_file(file_path)
+                    success, message = add_file(file_path)
+                    progress_text.empty()
                     
                     if success:
                         st.session_state["uploaded_files_list"] = get_uploaded_files()
-                        st.success(f"✅ Added '{uploaded_file.name}' successfully!")
+                        st.success(f"✅ {message}")
                         st.rerun()
                     else:
-                        st.error("❌ Failed to index the document")
+                        st.error(f"❌ {message}")
     
     st.divider()
     
@@ -171,15 +192,15 @@ with st.sidebar:
             
             with col2:
                 if st.button("🗑️", key=f"delete_{filename}", help="Delete this file"):
-                    with st.spinner(f"Removing {filename}..."):
-                        success = remove_file(file_path)
+                    with st.spinner(f"Removing '{filename}'..."):
+                        success, message = remove_file(file_path)
                         
                         if success:
                             st.session_state["uploaded_files_list"] = get_uploaded_files()
-                            st.success(f"Removed '{filename}'")
+                            st.success(f"✅ {message}")
                             st.rerun()
                         else:
-                            st.error(f"Failed to remove '{filename}'")
+                            st.error(f"❌ {message}")
             
             st.divider()
     else:

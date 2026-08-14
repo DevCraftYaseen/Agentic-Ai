@@ -56,7 +56,7 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 35:** Converted MCP chatbot to production-ready architecture with dedicated async event loop, AsyncSqliteSaver checkpointer, and Streamlit frontend; configured general-purpose AI assistant with intelligent tool routing for math operations and expense tracking.
 * **Day 36:** Built RAG-as-a-tool system with FAISS vector store, document retrieval, and LangGraph orchestration for intelligent context-based responses
 * **Day 37:** Implemented RAG chatbot with dynamic PDF management, vector search, and Streamlit frontend for intelligent document Q&A
-
+* **Day 37 Part 2"** Fixed bugs and issues related streaming and file managment in the RAG Chatbot 
 
 
 ---
