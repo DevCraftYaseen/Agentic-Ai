@@ -11,10 +11,13 @@ env/
 
 # Databases & Vector Stores
 *.db
+*.db*
 *.sqlite3
 chroma_langchain_db/
 LangSmith/indices
 RAG/faiss_index
+RAG/uploads
+RAG/RAG
 
 # =========================
 # Node & Frontend (Next.js, React)

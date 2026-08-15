@@ -1,4 +1,5 @@
 from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, BaseMessage, SystemMessage
@@ -43,8 +44,8 @@ def submit_async_task(coro):
 # 1. LLM Configuration
 # -------------------
 
-llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash', temperature=0)
-# llm = ChatOllama(model='qwen2.5-coder:7b', temperature=0)
+# llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash', temperature=0)
+llm = ChatOllama(model='llama3.1:8b', temperature=0)
 
 # -------------------
 # 2. RAG Components
@@ -313,9 +314,55 @@ def calculator(first_num: float, second_num: float, operation: str) -> dict:
     except Exception as e:
         return {"error": str(e)}
 
+@tool
+def web_search(query: str) -> dict:
+    """
+    Search the web using DuckDuckGo for current information, news, or general knowledge.
+    Use this when the user asks about current events, recent information, or topics not in uploaded documents.
+    
+    Args:
+        query: The search query
+        
+    Returns:
+        dict with 'status', 'results', and optional 'error' keys
+    """
+    try:
+        # Validate query
+        if not query or not query.strip():
+            return {
+                "status": "error",
+                "error": "Search query cannot be empty",
+                "results": None
+            }
+        
+        # Initialize search tool
+        search_tool = DuckDuckGoSearchRun()
+        
+        # Perform web search
+        search_results = search_tool.invoke(query)
+        
+        if not search_results or len(search_results.strip()) == 0:
+            return {
+                "status": "success",
+                "results": "No results found for this query.",
+                "query": query
+            }
+        
+        return {
+            "status": "success",
+            "results": search_results,
+            "query": query
+        }
+    
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": f"Web search error: {str(e)}",
+            "results": None
+        }
 
 @tool
-def search_documents(query: str) -> str:
+def search_documents(query: str) -> dict:
     """
     Search the uploaded documents for information relevant to the query.
     Use this when the user asks questions about the uploaded documents.
@@ -324,22 +371,55 @@ def search_documents(query: str) -> str:
         query: The search query or question about the documents
         
     Returns:
-        Relevant excerpts from the documents
+        dict with 'status', 'results', and optional 'error' keys
     """
-    if retriever is None:
-        return "No documents have been uploaded yet. Please upload PDF files first."
-    
     try:
+        # Validate query
+        if not query or not query.strip():
+            return {
+                "status": "error",
+                "error": "Search query cannot be empty",
+                "results": None
+            }
+        
+        # Check if documents are available
+        if retriever is None:
+            return {
+                "status": "error",
+                "error": "No documents have been uploaded yet. Please upload PDF files first.",
+                "results": None
+            }
+        
+        # Perform retrieval
         retrieved_docs = retriever.invoke(query)
+        
+        if not retrieved_docs:
+            return {
+                "status": "success",
+                "results": "No relevant information found in the uploaded documents for this query.",
+                "documents_searched": len(get_uploaded_files())
+            }
+        
+        # Format the results
         formatted_context = format_docs(retrieved_docs)
-        return formatted_context
+        
+        return {
+            "status": "success",
+            "results": formatted_context,
+            "chunks_found": len(retrieved_docs),
+            "documents_searched": len(get_uploaded_files())
+        }
     
     except Exception as e:
-        return f"Error retrieving documents: {str(e)}"
+        return {
+            "status": "error",
+            "error": f"Error retrieving documents: {str(e)}",
+            "results": None
+        }
 
 
 # Bind tools to LLM
-tools = [calculator, search_documents]
+tools = [calculator, search_documents, web_search]
 llm_with_tools = llm.bind_tools(tools)
 
 # -------------------
@@ -375,17 +455,26 @@ async def chat_node(state: ChatState):
         content=f"""You are a helpful AI assistant that can chat about any topic.
 
 You have access to specialized tools:
-- 'search_documents' tool: Searches uploaded PDF documents
-- 'calculator' tool: Performs math operations
+- 'search_documents': Searches uploaded PDF documents
+- 'web_search': Searches the web for current information
+- 'calculator': Performs math operations
 
 Currently uploaded documents: {file_list}
 
-IMPORTANT INSTRUCTIONS:
-- For questions about the uploaded documents → Use 'search_documents' tool
-- For math calculations → Use 'calculator' tool  
-- For ANY other topic (general knowledge, advice, conversation) → Respond naturally WITHOUT using tools
+CRITICAL TOOL USAGE RULES:
+1. ONLY use 'search_documents' when user EXPLICITLY asks about the uploaded documents or their content
+2. ONLY use 'web_search' when user asks for current events, news, or information you don't have
+3. ONLY use 'calculator' for math calculations
+4. For ALL general questions (explanations, comparisons, definitions, advice) → Answer directly from your knowledge WITHOUT tools
 
-Be friendly, helpful, and conversational. You can discuss any topic the user wants!"""
+Examples:
+- "What is AI?" → Answer directly (no tools)
+- "Compare AI and DS" → Answer directly (no tools)  
+- "What does the document say about AI?" → Use search_documents
+- "Latest news on AI" → Use web_search
+- "What is 5 + 3?" → Use calculator
+
+Be friendly and conversational. Answer most questions directly without tools unless specifically needed!"""
     )
     
     # Insert system message if not present

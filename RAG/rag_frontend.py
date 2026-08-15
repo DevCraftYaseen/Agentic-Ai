@@ -46,8 +46,17 @@ def add_thread(thread_id):
 
 
 def load_conversation(thread_id):
+    """Load conversation and filter out tool messages."""
     state = chatbot.get_state(config={"configurable": {"thread_id": thread_id}})
-    return state.values.get("messages", [])
+    messages = state.values.get("messages", [])
+    
+    # Filter out ToolMessage objects - only show Human and AI messages
+    filtered_messages = []
+    for msg in messages:
+        if isinstance(msg, (HumanMessage, AIMessage)):
+            filtered_messages.append(msg)
+    
+    return filtered_messages
 
 
 def save_uploaded_file(uploaded_file):
@@ -129,8 +138,21 @@ with st.sidebar:
                 
                 temp_messages = []
                 for msg in messages:
-                    role = "user" if isinstance(msg, HumanMessage) else "assistant"
-                    temp_messages.append({"role": role, "content": msg.content})
+                    # Only include Human and AI messages (tool messages already filtered in load_conversation)
+                    if isinstance(msg, HumanMessage):
+                        role = "user"
+                        content = msg.content
+                    elif isinstance(msg, AIMessage):
+                        role = "assistant"
+                        content = msg.content
+                    else:
+                        # Skip any other message types (ToolMessage, SystemMessage, etc.)
+                        continue
+                    
+                    # Skip empty messages
+                    if content and content.strip():
+                        temp_messages.append({"role": role, "content": content})
+                
                 st.session_state["message_history"] = temp_messages
                 st.rerun()
     
@@ -274,6 +296,7 @@ if user_input:
                     # Map tool names to friendly names
                     tool_display_names = {
                         "search_documents": "🔍 Searching Documents",
+                        "web_search": "🌐 Searching Web",
                         "calculator": "🧮 Calculating"
                     }
                     display_name = tool_display_names.get(tool_name, f"🔧 Using {tool_name}")
