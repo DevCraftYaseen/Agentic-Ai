@@ -58,6 +58,7 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 37:** Implemented RAG chatbot with dynamic PDF management, vector search, and Streamlit frontend for intelligent document Q&A
 * **Day 37 Part 2:** Fixed bugs and issues related streaming and file managment in the RAG Chatbot 
 * **Day 38:** Added Search tool, Improved UI and streaming responses as well as tool outputs in the RAG Chatbot
+* **Day 39:** Implemented Human-in-the-Loop (HITL) pattern with LangGraph interrupts; built basic approval chatbot and stock trading agent with real-time purchase authorization
 
 ---
 
