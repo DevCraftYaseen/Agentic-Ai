@@ -1,10 +1,8 @@
 """
-SubGraph as a Node Pattern
-----------------------------
-This demonstrates how to embed a compiled subgraph directly as a node in a parent graph.
+SubGraph as a Node Pattern with Persistence
+--------------------------------------------
+Embed a compiled subgraph directly as a node in a parent graph.
 The subgraph shares the same state structure as the parent graph.
-
-Use Case: Translation pipeline that generates English answers and translates to Urdu.
 """
 
 from typing import TypedDict
@@ -12,39 +10,30 @@ from langgraph.graph import StateGraph, END, START
 from dotenv import load_dotenv
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
+from langgraph.checkpoint.sqlite import SqliteSaver
+import sqlite3
+import time
 
 load_dotenv()
 
 
 class ParentState(TypedDict):
-    """Shared state structure for both parent and subgraph"""
     question: str
     english_answer: str
     urdu_answer: str
 
-# Initialize LLM
+
 llm = ChatOllama(model='llama3.1:8b')
 
 
 # ==================== SUB GRAPH ====================
 
 def translate_answer(state: ParentState) -> dict:
-    """
-    Translate English answer to Urdu with high accuracy.
-    
-    Args:
-        state: Contains 'english_answer' key with text to translate
-        
-    Returns:
-        Dictionary with 'urdu_answer' key containing translation
-    """
     english_text = state.get('english_answer', '').strip()
     
-    # Validation
     if not english_text:
         return {'urdu_answer': 'خالی جواب (Empty answer)'}
     
-    # translation prompt
     translation_prompt = ChatPromptTemplate.from_messages([
         ("system", """You are a professional English-to-Urdu translator.
 
@@ -67,35 +56,22 @@ Output the translation in proper Urdu script."""),
         return {'urdu_answer': f'Translation error: {str(e)}'}
 
 
-# Build subgraph
 subgraph_builder = StateGraph(ParentState)
 subgraph_builder.add_node('translate_answer', translate_answer)
 subgraph_builder.add_edge(START, "translate_answer")
 subgraph_builder.add_edge("translate_answer", END)
 
-# Compile the subgraph
 translation_subgraph = subgraph_builder.compile()
 
 
 # ==================== PARENT GRAPH ====================
 
 def generate_answer(state: ParentState) -> dict:
-    """
-    Generate a clear, concise answer to the user's question in English.
-    
-    Args:
-        state: Contains 'question' key with user query
-        
-    Returns:
-        Dictionary with 'english_answer' key containing response
-    """
     question = state.get('question', '').strip()
     
-    # Validation
     if not question:
         return {'english_answer': 'No question provided.'}
     
-    # Optimized answer generation prompt
     answer_prompt = ChatPromptTemplate.from_messages([
         ("system", """You are a helpful and knowledgeable AI assistant.
 
@@ -119,59 +95,60 @@ Tone: Friendly, professional, and informative."""),
         return {'english_answer': f'Error generating answer: {str(e)}'}
 
 
-# Build parent graph
 parent_builder = StateGraph(ParentState)
-
-# Add nodes (subgraph is added as a regular node)
 parent_builder.add_node('generate_answer', generate_answer)
 parent_builder.add_node('translate', translation_subgraph)
-
-# Add edges - linear flow
 parent_builder.add_edge(START, "generate_answer")
 parent_builder.add_edge("generate_answer", "translate")
 parent_builder.add_edge("translate", END)
 
-# Compile the parent graph
-bilingual_qa_agent = parent_builder.compile()
+conn = sqlite3.connect(database="bilingual_qa.db", check_same_thread=False)
+checkpointer = SqliteSaver(conn=conn)
+
+bilingual_qa_agent = parent_builder.compile(checkpointer=checkpointer)
 
 
-# ==================== MAIN EXECUTION ====================
+# ==================== MAIN ====================
 
 def main():
-    """Run the bilingual Q&A agent with example questions."""
+    thread_id = f"session_{int(time.time())}"
+    config = {'configurable': {'thread_id': thread_id}}
     
     print("=" * 70)
-    print("🌐 Bilingual Q&A Agent (English → Urdu)")
+    print("💬 Bilingual Q&A Agent (English → Urdu)")
     print("=" * 70)
-    print("\nThis agent answers questions in English and translates to Urdu.\n")
+    print(f"\nSession ID: {thread_id}")
+    print("Type your questions in English. Type 'exit' to quit.\n")
+    print("=" * 70 + "\n")
     
-    # Test questions
-    test_questions = [
-        "What is AI in simple words?",
-        "How does machine learning work?",
-        "What is the capital of Pakistan?"
-    ]
+    try:
+        while True:
+            question = input("You: ").strip()
+            
+            if not question:
+                continue
+            
+            if question.lower() in ['exit', 'quit', 'bye']:
+                break
+            
+            try:
+                result = bilingual_qa_agent.invoke(
+                    {'question': question},
+                    config=config
+                )
+                
+                print(f"\n📝 English: {result['english_answer']}")
+                print(f"🌍 Urdu: {result['urdu_answer']}\n")
+                
+            except Exception as e:
+                print(f"❌ Error: {str(e)}\n")
     
-    for i, question in enumerate(test_questions, 1):
-        print(f"\n{'='*70}")
-        print(f"Question {i}: {question}")
-        print('='*70)
-        
-        try:
-            result = bilingual_qa_agent.invoke({'question': question})
-            
-            print(f"\n📝 English Answer:")
-            print(f"   {result['english_answer']}")
-            
-            print(f"\n🌍 Urdu Translation:")
-            print(f"   {result['urdu_answer']}")
-            
-        except Exception as e:
-            print(f"❌ Error: {str(e)}")
+    except KeyboardInterrupt:
+        print("\n\nInterrupted by user.")
     
-    print("\n" + "="*70)
-    print("✅ Demo completed!")
-    print("="*70 + "\n")
+    print("\n" + "=" * 70)
+    print(f"💾 Session saved with ID: {thread_id}")
+    print("=" * 70 + "\n")
 
 
 if __name__ == "__main__":
