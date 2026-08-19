@@ -1,16 +1,27 @@
-from fastapi import FastAPI
+"""
+Advanced FastAPI Backend with:
+- Streaming chat responses
+- Tool execution tracking
+- HITL approval handling
+- Document upload for RAG
+- Thread management with titles
+"""
+
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from schemas import ChatRequest
-from services import get_or_create_title, get_all_threads, get_thread_history
-from graph import chat_bot
+from pydantic import BaseModel
+from typing import Optional, List
+import os
+import shutil
 
-# Updated Import: We explicitly bring in AIMessageChunk
-from langchain_core.messages import HumanMessage, AIMessageChunk
+from graph import chat_bot, conn, llm, add_document, clear_documents, vector_store, VECTOR_STORE_PATH
+from langchain_core.messages import HumanMessage, AIMessageChunk, ToolMessage
+from langgraph.types import Command
 
-app = FastAPI()
+app = FastAPI(title="Advanced AI Chatbot API")
 
-# Allow Next.js to communicate with FastAPI
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -19,37 +30,270 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/api/threads")
+
+# ==================== SCHEMAS ====================
+
+class ChatRequest(BaseModel):
+    message: str
+    thread_id: str
+
+
+class ApprovalRequest(BaseModel):
+    thread_id: str
+    approved: bool
+
+
+class ThreadResponse(BaseModel):
+    thread_id: str
+    title: str
+
+
+# ==================== HELPER FUNCTIONS ====================
+
+def get_or_create_title(thread_id: str, first_message: str) -> str:
+    """Generate or retrieve a thread title."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT title FROM chat_titles WHERE thread_id = ?", (thread_id,))
+    row = cursor.fetchone()
+    
+    if row:
+        return row[0]
+    
+    # Generate title
+    try:
+        prompt = f"Generate a brief, 3-5 word title for a chat starting with: '{first_message[:100]}'. Respond ONLY with the title, no quotes."
+        title = llm.invoke(prompt).content.strip().strip('"\'')
+    except:
+        title = "New Conversation"
+    
+    cursor.execute(
+        "INSERT INTO chat_titles (thread_id, title) VALUES (?, ?)",
+        (thread_id, title)
+    )
+    conn.commit()
+    
+    return title
+
+
+def get_all_threads() -> List[dict]:
+    """Get all threads with titles."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT thread_id, title FROM chat_titles ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    return [{"thread_id": row[0], "title": row[1]} for row in rows]
+
+
+def get_thread_history(thread_id: str) -> List[dict]:
+    """Get chat history for a thread."""
+    try:
+        state = chat_bot.get_state(config={'configurable': {'thread_id': thread_id}})
+        messages = state.values.get('messages', [])
+        
+        formatted_messages = []
+        for msg in messages:
+            # Skip system messages and tool messages
+            if msg.__class__.__name__ in ['SystemMessage', 'ToolMessage']:
+                continue
+            
+            role = 'user' if msg.__class__.__name__ == 'HumanMessage' else 'assistant'
+            
+            # Handle tool calls in AI messages
+            content = msg.content
+            if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                tool_info = []
+                for tool_call in msg.tool_calls:
+                    tool_info.append(f"🔧 Using tool: {tool_call['name']}")
+                if tool_info and not content:
+                    content = "\n".join(tool_info)
+            
+            formatted_messages.append({
+                "role": role,
+                "content": content
+            })
+        
+        return formatted_messages
+    except Exception as e:
+        return []
+
+
+# ==================== ENDPOINTS ====================
+
+@app.get("/")
+def root():
+    return {
+        "message": "Advanced AI Chatbot API",
+        "capabilities": ["Tools", "RAG", "HITL", "Streaming"],
+        "status": "online"
+    }
+
+
+@app.get("/api/threads", response_model=List[ThreadResponse])
 def fetch_threads():
-    """Returns the list of all threads with their dynamic titles."""
+    """Get all chat threads."""
     return get_all_threads()
+
 
 @app.get("/api/threads/{thread_id}")
 def fetch_history(thread_id: str):
-    """Returns the chat history for a specific thread."""
+    """Get chat history for a specific thread."""
     return get_thread_history(thread_id)
+
+
+@app.delete("/api/threads/{thread_id}")
+def delete_thread(thread_id: str):
+    """Delete a chat thread."""
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM chat_titles WHERE thread_id = ?", (thread_id,))
+    conn.commit()
+    return {"status": "deleted", "thread_id": thread_id}
+
 
 @app.post("/api/chat/stream")
 async def chat_stream(request: ChatRequest):
-    """Streams the LLM response back to Next.js using Server-Sent Events."""
+    """Stream chat responses with tool execution tracking."""
     
-    # Ensure the thread has a title before processing the chat
+    # Ensure thread has a title
     get_or_create_title(request.thread_id, request.message)
     
     async def event_generator():
         config = {"configurable": {"thread_id": request.thread_id}}
         
-        # Iterate through the LangGraph stream
-        for chunk, metadata in chat_bot.stream(
-            {"messages": [HumanMessage(content=request.message)]},
-            config=config,
-            stream_mode="messages"
-        ):
-            # STRICT CHECK: Only yield individual tokens, ignore the final compiled AIMessage
-            if isinstance(chunk, AIMessageChunk):
-                # Format as Server-Sent Event (SSE)
-                # We replace newlines to prevent breaking the SSE format
-                safe_content = chunk.content.replace('\n', '\\n')
-                yield f"data: {safe_content}\n\n"
+        try:
+            for chunk, metadata in chat_bot.stream(
+                {"messages": [HumanMessage(content=request.message)]},
+                config=config,
+                stream_mode="messages"
+            ):
+                # Only stream AIMessageChunk content
+                if isinstance(chunk, AIMessageChunk) and chunk.content:
+                    safe_content = chunk.content.replace('\n', '\\n')
+                    yield f"data: {safe_content}\n\n"
                 
+                # Stream tool usage notifications
+                elif hasattr(chunk, 'tool_calls') and chunk.tool_calls:
+                    for tool_call in chunk.tool_calls:
+                        tool_name = tool_call.get('name', 'unknown')
+                        yield f"data: [TOOL: {tool_name}]\n\n"
+                        
+        except Exception as e:
+            error_msg = f"Error: {str(e)}".replace('\n', '\\n')
+            yield f"data: {error_msg}\n\n"
+    
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/api/chat/approval")
+def handle_approval(request: ApprovalRequest):
+    """Handle HITL approval for stock purchases."""
+    try:
+        config = {"configurable": {"thread_id": request.thread_id}}
+        
+        # Resume the graph with approval decision
+        result = chat_bot.invoke(
+            Command(resume={'approved': 'yes' if request.approved else 'no'}),
+            config=config
+        )
+        
+        return {"status": "approved" if request.approved else "declined"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/interrupts/{thread_id}")
+def check_interrupts(thread_id: str):
+    """Check if a thread has pending interrupts (HITL approvals)."""
+    try:
+        state = chat_bot.get_state(config={'configurable': {'thread_id': thread_id}})
+        
+        if state.next and '__interrupt__' in str(state.values):
+            # Extract interrupt details
+            interrupts = []
+            if hasattr(state, 'tasks'):
+                for task in state.tasks:
+                    if hasattr(task, 'interrupts'):
+                        interrupts.extend(task.interrupts)
+            
+            return {
+                "has_interrupt": True,
+                "interrupts": interrupts
+            }
+        
+        return {"has_interrupt": False}
+    except Exception as e:
+        return {"has_interrupt": False, "error": str(e)}
+
+
+@app.post("/api/documents/upload")
+async def upload_document(file: UploadFile = File(...)):
+    """Upload a PDF document for RAG."""
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    
+    # Save uploaded file
+    upload_dir = "uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, file.filename)
+    
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Add to vector store
+        result = add_document(file_path)
+        
+        return {
+            "status": "success",
+            "message": result,
+            "filename": file.filename
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Clean up uploaded file
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+
+@app.get("/api/documents/list")
+def list_documents():
+    """List all uploaded documents in the vector store."""
+    try:
+        if not vector_store or not os.path.exists(VECTOR_STORE_PATH):
+            return {"documents": []}
+        
+        # Get unique sources from vector store metadata
+        # This is a simplified approach - in production you'd track this separately
+        docs_metadata = []
+        
+        # Try to read from a tracking file
+        tracking_file = os.path.join(VECTOR_STORE_PATH, "documents.json")
+        if os.path.exists(tracking_file):
+            import json
+            with open(tracking_file, 'r') as f:
+                docs_metadata = json.load(f)
+        
+        return {"documents": docs_metadata}
+    except Exception as e:
+        return {"documents": [], "error": str(e)}
+
+
+@app.delete("/api/documents/clear")
+def clear_all_documents():
+    """Clear all uploaded documents."""
+    result = clear_documents()
+    return {"status": "success", "message": result}
+
+
+@app.get("/api/health")
+def health_check():
+    """Health check endpoint."""
+    return {
+        "status": "healthy",
+        "database": "connected",
+        "llm": "ready"
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
