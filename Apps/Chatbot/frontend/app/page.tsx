@@ -1,9 +1,8 @@
-// app/page.tsx
 import ChatClient from "./components/ChatClient";
 
 export default function Home() {
   return (
-    <main className="flex h-screen bg-gray-50 overflow-hidden">
+    <main className="flex h-screen bg-background overflow-hidden">
       <ChatClient />
     </main>
   );

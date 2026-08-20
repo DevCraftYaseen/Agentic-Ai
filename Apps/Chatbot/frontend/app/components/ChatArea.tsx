@@ -1,4 +1,5 @@
-// components/ChatArea.tsx
+"use client";
+
 import { useEffect, useRef } from "react";
 import { Message } from "./ChatClient";
 import { Send, Menu, Bot, User } from "lucide-react";
@@ -13,7 +14,14 @@ interface ChatAreaProps {
   toggleSidebar: () => void;
 }
 
-export default function ChatArea({ messages, input, setInput, sendMessage, isStreaming, toggleSidebar }: ChatAreaProps) {
+export default function ChatArea({ 
+  messages, 
+  input, 
+  setInput, 
+  sendMessage, 
+  isStreaming, 
+  toggleSidebar 
+}: ChatAreaProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -21,72 +29,105 @@ export default function ChatArea({ messages, input, setInput, sendMessage, isStr
   }, [messages]);
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-white relative">
+    <div className="flex-1 flex flex-col h-full bg-background">
       {/* Mobile Header */}
-      <div className="md:hidden flex items-center p-4 border-b border-gray-200 bg-white shadow-sm z-10">
-        <button onClick={toggleSidebar} className="p-2 -ml-2 text-gray-600 hover:text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <Menu size={24} />
+      <div className="md:hidden flex items-center p-4 border-b border-border bg-card shadow-sm">
+        <button 
+          onClick={toggleSidebar} 
+          className="p-2 -ml-2 text-muted-foreground hover:text-foreground rounded-xl transition-colors hover:bg-accent"
+          aria-label="Open sidebar"
+        >
+          <Menu className="w-6 h-6" />
         </button>
-        <span className="ml-2 font-bold text-gray-800">DevCraftYaseen Chat</span>
+        <span className="ml-3 font-semibold text-foreground">AI Assistant</span>
       </div>
 
-      {/* Messages Array */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-6 md:p-8">
         {messages.length === 0 ? (
-          <div className="flex flex-col h-full items-center justify-center text-gray-400 space-y-4">
-            <Bot size={48} className="text-gray-300" />
-            <p className="text-lg font-medium">How can I help you build today?</p>
+          <div className="flex flex-col h-full items-center justify-center px-4 max-w-4xl mx-auto">
+            <div className="bg-primary p-6 rounded-3xl mb-6 shadow-lg">
+              <Bot className="w-12 h-12 text-primary-foreground" />
+            </div>
+            <div className="text-center space-y-3 mb-12">
+              <h1 className="text-4xl font-bold text-foreground">Welcome to AI Assistant</h1>
+              <p className="text-muted-foreground max-w-xl text-lg leading-relaxed">
+                I can help you with web searches, calculations, stock prices, document analysis, and more!
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
+              <div className="border-2 border-border hover:border-primary rounded-2xl p-6 transition-all cursor-pointer group hover:shadow-md bg-card">
+                <div className="text-3xl mb-3">🔍</div>
+                <p className="font-semibold text-foreground mb-1">Web Search</p>
+                <p className="text-sm text-muted-foreground">Search for current information</p>
+              </div>
+              <div className="border-2 border-border hover:border-primary rounded-2xl p-6 transition-all cursor-pointer group hover:shadow-md bg-card">
+                <div className="text-3xl mb-3">🧮</div>
+                <p className="font-semibold text-foreground mb-1">Calculator</p>
+                <p className="text-sm text-muted-foreground">Solve mathematical problems</p>
+              </div>
+              <div className="border-2 border-border hover:border-primary rounded-2xl p-6 transition-all cursor-pointer group hover:shadow-md bg-card">
+                <div className="text-3xl mb-3">📈</div>
+                <p className="font-semibold text-foreground mb-1">Stock Prices</p>
+                <p className="text-sm text-muted-foreground">Get real-time market data</p>
+              </div>
+              <div className="border-2 border-border hover:border-primary rounded-2xl p-6 transition-all cursor-pointer group hover:shadow-md bg-card">
+                <div className="text-3xl mb-3">📄</div>
+                <p className="font-semibold text-foreground mb-1">Document Q&A</p>
+                <p className="text-sm text-muted-foreground">Ask questions about PDFs</p>
+              </div>
+            </div>
           </div>
         ) : (
-          messages.map((msg, idx) => (
-            <div key={idx} className={`flex gap-4 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              
-              {/* AI Avatar */}
-              {msg.role === "assistant" && (
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-1">
-                  <Bot size={18} className="text-blue-600" />
-                </div>
-              )}
+          <div className="max-w-4xl mx-auto space-y-6">
+            {messages.map((msg, idx) => (
+              <div 
+                key={idx} 
+                className={`flex gap-4 animate-fadeIn ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                {msg.role === "assistant" && (
+                  <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0 shadow-sm">
+                    <Bot className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                )}
 
-              {/* Chat Bubble */}
-              <div className={`max-w-[85%] md:max-w-3xl p-4 rounded-2xl shadow-sm ${
-                msg.role === "user" 
-                  ? "bg-blue-600 text-white rounded-tr-sm" 
-                  : "bg-gray-50 text-gray-800 border border-gray-100 rounded-tl-sm"
-              }`}>
-                {msg.role === "user" ? (
-                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                ) : (
-                  <div className="prose prose-sm md:prose-base prose-blue max-w-none">
-                    {/* FIX: If the message is empty and we are streaming, show the typing dots */}
-                    {msg.content === "" && isStreaming ? (
-                      <div className="flex space-x-1.5 h-6 items-center px-2">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                      </div>
-                    ) : (
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
-                    )}
+                <div className={`max-w-[85%] md:max-w-3xl p-4 rounded-2xl ${
+                  msg.role === "user" 
+                    ? "bg-primary text-primary-foreground rounded-tr-md shadow-md" 
+                    : "bg-card text-card-foreground border border-border rounded-tl-md shadow-sm"
+                }`}>
+                  {msg.role === "user" ? (
+                    <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                  ) : (
+                    <div className="prose prose-sm md:prose-base max-w-none">
+                      {msg.content === "" && isStreaming ? (
+                        <div className="flex space-x-2 h-6 items-center">
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                        </div>
+                      ) : (
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {msg.role === "user" && (
+                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0 shadow-sm">
+                    <User className="w-5 h-5 text-muted-foreground" />
                   </div>
                 )}
               </div>
-
-              {/* User Avatar */}
-              {msg.role === "user" && (
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0 mt-1">
-                  <User size={18} className="text-gray-600" />
-                </div>
-              )}
-            </div>
-          ))
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Field */}
-      <div className="p-4 md:p-6 bg-white border-t border-gray-100">
-        <form onSubmit={sendMessage} className="max-w-4xl mx-auto relative flex items-end gap-2">
+      {/* Input Area */}
+      <div className="p-6 bg-card border-t border-border">
+        <form onSubmit={sendMessage} className="max-w-4xl mx-auto flex items-end gap-3">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -97,19 +138,22 @@ export default function ChatArea({ messages, input, setInput, sendMessage, isStr
               }
             }}
             disabled={isStreaming}
-            placeholder="Type your message... (Shift+Enter for new line)"
-            // FIX: Added text-gray-900, bg-white, and font-medium to make the text clearly visible
-            className="flex-1 max-h-32 min-h-[56px] text-gray-900 font-medium bg-white border border-gray-300 placeholder-gray-400 rounded-xl px-4 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 resize-none shadow-sm"
+            placeholder="Ask me anything... (Shift+Enter for new line)"
+            className="flex-1 max-h-32 min-h-[56px] text-foreground bg-background border-2 border-input focus:border-ring placeholder:text-muted-foreground rounded-2xl px-5 py-4 focus:outline-none disabled:opacity-50 resize-none transition-all shadow-sm"
             rows={1}
           />
           <button
             type="submit"
             disabled={isStreaming || !input.trim()}
-            className="h-[56px] w-[56px] flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl font-semibold transition duration-200 shadow-sm shrink-0"
+            className="h-[56px] w-[56px] flex items-center justify-center bg-primary hover:bg-primary/90 disabled:bg-muted disabled:cursor-not-allowed text-primary-foreground rounded-2xl transition-all shadow-md hover:shadow-lg shrink-0 active:scale-[0.98]"
+            aria-label="Send message"
           >
-            <Send size={20} />
+            <Send className="w-5 h-5" />
           </button>
         </form>
+        <p className="text-xs text-muted-foreground text-center mt-4">
+          AI can make mistakes. Verify important information.
+        </p>
       </div>
     </div>
   );
