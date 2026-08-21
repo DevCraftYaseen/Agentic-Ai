@@ -21,8 +21,8 @@ load_dotenv()
 # -------------------
 # 1. LLM Configuration
 # -------------------
-llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
-# llm = ChatOllama(model = 'qwen2.5-coder:7b')
+# llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
+llm = ChatOllama(model = 'llama3.1:8b')
 
 # -------------------
 # 2. RAG Components
