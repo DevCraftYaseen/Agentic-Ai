@@ -37,8 +37,8 @@ VECTOR_STORE_PATH = "vector_store"
 # - llm_conversational: higher temperature, used ONLY for genuinely tool-free
 #   turns (greetings, chit-chat, opinions) where a warmer, more natural voice
 #   is desirable and there's no retrieved context to stay faithful to.
-llm_grounded = ChatOllama(model='llama3.1:8b', temperature=0.2)
-llm_conversational = ChatOllama(model='llama3.1:8b', temperature=0.7)
+llm_grounded = ChatOllama(model='qwen3.5:9b', temperature=0.2)
+llm_conversational = ChatOllama(model='qwen3.5:9b', temperature=0.7)
 embeddings = OllamaEmbeddings(model="nomic-embed-text")
 
 # Initialize or load vector store

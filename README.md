@@ -61,7 +61,10 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 39:** Implemented Human-in-the-Loop (HITL) pattern with LangGraph interrupts; built basic approval chatbot and stock trading agent with real-time purchase authorization
 * **Day 40:** Implemented LangGraph subgraph patterns (embedded & invoked) with optimized prompt engineering; built bilingual Q&A system with English-to-Urdu translation pipeline and production-grade error handling
 * **Day 41:** Added Persistance using sqlite to bilingual Q&A system with English-to-Urdu translation 
-
+* **Day 42 :** Improved backend graph with better prompts and erorr handling
+* **Day 43 :** Built frontend using next js and tailwind css for our chatbot
+* **Day 44 :** Fix streaming pipeline end-to-end and resolve HITL approval detection bug
+* **Day 45 :** Learn deeply about the Memory in LLM such as STM and LTM
 
 ---
 
