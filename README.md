@@ -64,8 +64,8 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 42 :** Improved backend graph with better prompts and erorr handling
 * **Day 43 :** Built frontend using next js and tailwind css for our chatbot
 * **Day 44 :** Fix streaming pipeline end-to-end and resolve HITL approval detection bug
-* **Day 45 :** Learn deeply about the Memory in LLM such as STM and LTM
-
+* **Day 45:** Learn deeply about the Memory in LLM such as STM and LTM
+* **Day 46:** Implemented Short-Term Memory (STM) in LangGraph with async PostgreSQL checkpointer, real-time streaming, and message trimming for context window management
 ---
 
 ## ⚙️ Local Setup & Installation
