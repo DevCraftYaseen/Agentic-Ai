@@ -66,6 +66,7 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 44 :** Fix streaming pipeline end-to-end and resolve HITL approval detection bug
 * **Day 45:** Learn deeply about the Memory in LLM such as STM and LTM
 * **Day 46:** Implemented Short-Term Memory (STM) in LangGraph with async PostgreSQL checkpointer, real-time streaming, and message trimming for context window management
+* **Day 47:** Added Summarization and deletion to the STM
 ---
 
 ## ⚙️ Local Setup & Installation
