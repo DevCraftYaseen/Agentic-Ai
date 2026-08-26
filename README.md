@@ -67,6 +67,8 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 45:** Learn deeply about the Memory in LLM such as STM and LTM
 * **Day 46:** Implemented Short-Term Memory (STM) in LangGraph with async PostgreSQL checkpointer, real-time streaming, and message trimming for context window management
 * **Day 47:** Added Summarization and deletion to the STM
+* **Day 48:** Implemented Long-Term Memory (LTM) in LangGraph with InMemoryStore, namespace-based memory isolation, semantic search using embeddings, and personalized context retrieval
+
 ---
 
 ## ⚙️ Local Setup & Installation
