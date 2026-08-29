@@ -90,6 +90,7 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 48:** Implemented Long-Term Memory (LTM) in LangGraph with InMemoryStore, namespace-based memory isolation, semantic search using embeddings, and personalized context retrieval
 * **Day 49:** Advanced LTM implementation with PostgreSQL persistence, memory deduplication to prevent redundant storage, controlled memory writing with structured extraction, and terminal-based chatbot with optimized prompts for natural personalized responses
 * **Day 50:** Integrated Short-Term Memory (STM) and Long-Term Memory (LTM) into production chatbot: STM with message trimming for context window management, LTM with PostgreSQL persistence for user personalization, automatic memory extraction and deduplication, and unified FastAPI backend serving both memory systems
+* **Day 51:** Built automated technical blog writer using LangGraph map-reduce pattern with Send API for parallel section generation: v1 with basic planning and worker nodes, v2 with advanced structured planning (goal-oriented sections, concrete bullets, section types), technical writing prompts for developer-focused content, and automatic markdown file generation
 
 ---
 
