@@ -17,29 +17,39 @@ from typing import Optional, List
 import os
 import shutil
 
-from graph import graph, conn, llm_conversational, add_document, clear_documents, vector_store, VECTOR_STORE_PATH
+from graph import graph, conn, llm_conversational, add_document, clear_documents, vector_store, VECTOR_STORE_PATH, FIXED_USER_ID
 from langchain_core.messages import HumanMessage, AIMessageChunk, ToolMessage
 from langgraph.types import Command
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.store.postgres.aio import AsyncPostgresStore
 
 # Set once the lifespan startup below finishes compiling the graph with its
-# async checkpointer. Endpoints reference this module-level name at call
+# async checkpointer and store. Endpoints reference this module-level name at call
 # time (not import time), so it's safe for them to be defined before this
 # is assigned — FastAPI guarantees lifespan startup completes before any
 # request is served.
 chat_bot = None
+memory_store = None  # LTM store
+
+DB_URI = os.getenv('DB_URI')  # PostgreSQL connection for LTM
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global chat_bot
-    # Deliberately a separate db file from conn's chatbot.db (chat_titles
-    # table) — two different sqlite drivers (sync sqlite3 + aiosqlite)
-    # writing to the same file concurrently risks SQLITE_BUSY lock errors.
-    async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as checkpointer:
-        chat_bot = graph.compile(checkpointer=checkpointer)
-        yield
-    # AsyncSqliteSaver's connection is closed automatically on exit here
+    global chat_bot, memory_store
+    
+    # Initialize AsyncPostgresStore for LTM
+    async with AsyncPostgresStore.from_conn_string(DB_URI) as store:
+        await store.setup()
+        memory_store = store
+        
+        # Initialize AsyncSqliteSaver for STM checkpointing
+        async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as checkpointer:
+            # Compile graph with both store (LTM) and checkpointer (STM)
+            chat_bot = graph.compile(checkpointer=checkpointer, store=store)
+            yield
+    
+    # Both connections close automatically on exit
 
 
 app = FastAPI(title="Advanced AI Chatbot API", lifespan=lifespan)
@@ -110,7 +120,13 @@ def get_all_threads() -> List[dict]:
 async def get_thread_history(thread_id: str) -> List[dict]:
     """Get chat history for a thread."""
     try:
-        state = await chat_bot.aget_state(config={'configurable': {'thread_id': thread_id}})
+        config = {
+            'configurable': {
+                'thread_id': thread_id,
+                'user_id': FIXED_USER_ID
+            }
+        }
+        state = await chat_bot.aget_state(config=config)
         messages = state.values.get('messages', [])
 
         formatted_messages = []
@@ -145,7 +161,13 @@ async def get_pending_interrupts(thread_id: str) -> List[dict]:
     (`{"value": {...}}`), regardless of how LangGraph internally represents
     the Interrupt object across versions.
     """
-    state = await chat_bot.aget_state(config={'configurable': {'thread_id': thread_id}})
+    config = {
+        'configurable': {
+            'thread_id': thread_id,
+            'user_id': FIXED_USER_ID
+        }
+    }
+    state = await chat_bot.aget_state(config=config)
 
     # state.next is a non-empty tuple (e.g. ('tools',)) when the graph is
     # paused mid-execution — this, not state.values, is what tells us
@@ -205,7 +227,12 @@ async def chat_stream(request: ChatRequest):
     get_or_create_title(request.thread_id, request.message)
 
     async def event_generator():
-        config = {"configurable": {"thread_id": request.thread_id}}
+        config = {
+            "configurable": {
+                "thread_id": request.thread_id,
+                "user_id": FIXED_USER_ID
+            }
+        }
 
         try:
             async for chunk, metadata in chat_bot.astream(
@@ -233,7 +260,12 @@ async def chat_stream(request: ChatRequest):
 async def handle_approval(request: ApprovalRequest):
     """Handle HITL approval for stock purchases."""
     try:
-        config = {"configurable": {"thread_id": request.thread_id}}
+        config = {
+            "configurable": {
+                "thread_id": request.thread_id,
+                "user_id": FIXED_USER_ID
+            }
+        }
 
         await chat_bot.ainvoke(
             Command(resume={'approved': 'yes' if request.approved else 'no'}),
@@ -319,8 +351,33 @@ def health_check():
     return {
         "status": "healthy",
         "database": "connected",
-        "llm": "ready"
+        "llm": "ready",
+        "memory": "enabled"
     }
+
+
+@app.get("/api/memories")
+async def get_memories():
+    """Get stored user memories (LTM)."""
+    try:
+        if not memory_store:
+            return {"memories": [], "error": "Memory store not initialized"}
+        
+        ns = ("user", FIXED_USER_ID, "details")
+        items = memory_store.search(ns)
+        
+        memories = []
+        if items:
+            for item in items:
+                memories.append({
+                    "id": item.key,
+                    "data": item.value.get("data", ""),
+                    "created_at": item.created_at.isoformat() if hasattr(item, 'created_at') else None
+                })
+        
+        return {"memories": memories, "user_id": FIXED_USER_ID}
+    except Exception as e:
+        return {"memories": [], "error": str(e)}
 
 
 if __name__ == "__main__":
