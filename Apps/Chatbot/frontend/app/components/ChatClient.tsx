@@ -143,12 +143,18 @@ export default function ChatClient() {
         }),
       });
 
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
       if (!response.body) throw new Error("No response body");
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       
       let done = false;
+      let hasContent = false;
+      
       while (!done) {
         const { value, done: doneReading } = await reader.read();
         done = doneReading;
@@ -161,9 +167,24 @@ export default function ChatClient() {
             if (line.startsWith("data: ")) {
               const textChunk = line.replace("data: ", "");
               
+              // Filter out technical/internal content
+              if (
+                textChunk.includes("AsyncPostgresStore") || 
+                textChunk.includes("should_write") ||
+                textChunk.includes("is_new") ||
+                textChunk.includes("memories") ||
+                textChunk.includes("Error: Synchronous") ||
+                textChunk.match(/^\{.*"should_write".*\}$/) ||
+                textChunk.match(/^\{.*"memories".*\}$/)
+              ) {
+                console.debug("Filtered technical output:", textChunk);
+                continue;
+              }
+              
               if (textChunk.startsWith("[TOOL:")) {
                 const toolName = textChunk.match(/\[TOOL: (.*)\]/)?.[1];
                 if (toolName) {
+                  hasContent = true;
                   setMessages((prev) => {
                     const updated = [...prev];
                     const lastIndex = updated.length - 1;
@@ -174,8 +195,9 @@ export default function ChatClient() {
                     return updated;
                   });
                 }
-              } else {
-                const cleanChunk = textChunk.replace(/\\n/g, "\n");
+              } else if (textChunk.trim()) {
+                hasContent = true;
+                const cleanChunk = textChunk.replace(/\\n/g, "\n").replace(/\\"/g, '"');
                 
                 setMessages((prev) => {
                   const updated = [...prev];
@@ -192,6 +214,19 @@ export default function ChatClient() {
         }
       }
       
+      // If no content was received, show a friendly error
+      if (!hasContent) {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastIndex = updated.length - 1;
+          updated[lastIndex] = {
+            ...updated[lastIndex],
+            content: "I apologize, but I encountered an issue processing your request. Please try again."
+          };
+          return updated;
+        });
+      }
+      
       fetchThreads();
       setTimeout(() => checkForApprovals(currentThreadId), 500);
       
@@ -202,7 +237,7 @@ export default function ChatClient() {
         const lastIndex = updated.length - 1;
         updated[lastIndex] = {
           ...updated[lastIndex],
-          content: "Error: Failed to get response from server."
+          content: "I apologize, but I'm having trouble connecting to the server. Please check your connection and try again."
         };
         return updated;
       });

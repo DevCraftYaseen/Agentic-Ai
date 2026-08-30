@@ -38,7 +38,8 @@ DB_URI = os.getenv('DB_URI')  # PostgreSQL connection for LTM
 async def lifespan(app: FastAPI):
     global chat_bot, memory_store
     
-    # Initialize AsyncPostgresStore for LTM
+    # Initialize AsyncPostgresStore for LTM (persistence only, no vectors)
+    # Semantic search handled by separate FAISS store in graph.py
     async with AsyncPostgresStore.from_conn_string(DB_URI) as store:
         await store.setup()
         memory_store = store
@@ -241,7 +242,7 @@ async def chat_stream(request: ChatRequest):
                 stream_mode="messages"
             ):
                 if isinstance(chunk, AIMessageChunk) and chunk.content:
-                    safe_content = chunk.content.replace('\n', '\\n')
+                    safe_content = chunk.content.replace('\n', '\\n').replace('"', '\\"')
                     yield f"data: {safe_content}\n\n"
 
                 elif hasattr(chunk, 'tool_calls') and chunk.tool_calls:
@@ -250,7 +251,10 @@ async def chat_stream(request: ChatRequest):
                         yield f"data: [TOOL: {tool_name}]\n\n"
 
         except Exception as e:
-            error_msg = f"Error: {str(e)}".replace('\n', '\\n')
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Streaming error: {error_trace}")  # Log to console
+            error_msg = f"I apologize, but I encountered an error processing your request. Please try again."
             yield f"data: {error_msg}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
@@ -364,7 +368,7 @@ async def get_memories():
             return {"memories": [], "error": "Memory store not initialized"}
         
         ns = ("user", FIXED_USER_ID, "details")
-        items = memory_store.search(ns)
+        items = await memory_store.asearch(ns)  # Use async search
         
         memories = []
         if items:
@@ -382,4 +386,21 @@ async def get_memories():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import sys
+    import asyncio
+    
+    # Windows requires SelectorEventLoop for psycopg async operations
+    if sys.platform == 'win32':
+        import selectors
+        
+        # Create and set a new SelectorEventLoop
+        selector = selectors.SelectSelector()
+        loop = asyncio.SelectorEventLoop(selector)
+        asyncio.set_event_loop(loop)
+        
+        # Run uvicorn with the custom event loop
+        config = uvicorn.Config(app, host="0.0.0.0", port=8000, loop="asyncio")
+        server = uvicorn.Server(config)
+        loop.run_until_complete(server.serve())
+    else:
+        uvicorn.run(app, host="0.0.0.0", port=8000)

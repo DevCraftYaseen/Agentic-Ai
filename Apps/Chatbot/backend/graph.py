@@ -4,13 +4,15 @@ Advanced LangGraph with Multiple Capabilities:
 - RAG (Document Q&A with FAISS)
 - HITL (Human-in-the-Loop for critical actions)
 - STM (Short-Term Memory with message trimming)
-- LTM (Long-Term Memory with PostgreSQL persistence)
+- LTM (Long-Term Memory with PostgreSQL persistence + FAISS semantic search)
 """
 
 import os
 import sqlite3
 import uuid
-from typing import TypedDict, Annotated, List
+import pickle
+from pathlib import Path
+from typing import TypedDict, Annotated, List, Dict
 from pydantic import BaseModel, Field
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage, ToolMessage
 from langchain_core.messages.utils import trim_messages, count_tokens_approximately
@@ -25,6 +27,7 @@ from langchain_core.tools import tool
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.documents import Document
 from dotenv import load_dotenv
 import requests
 from datetime import datetime
@@ -34,20 +37,72 @@ load_dotenv()
 # Configuration
 STOCK_API_KEY = os.getenv('STOCK_API_KEY')
 VECTOR_STORE_PATH = "vector_store"
+MEMORY_VECTOR_STORE_PATH = "memory_vector_store"  # Separate FAISS for memories
 FIXED_USER_ID = "default-user"  # Fixed user ID for LTM (will be dynamic later)
 MESSAGE_THRESHOLD = 15  # STM: Trigger summarization after 15 messages
 
 # ==================== LLM SETUP ====================
-llm_grounded = ChatOllama(model='qwen3.5:9b', temperature=0.2)
-llm_conversational = ChatOllama(model='qwen3.5:9b', temperature=0.7)
-memory_llm = ChatOllama(model='qwen3.5:9b', temperature=0)  # For LTM extraction
+llm_grounded = ChatOllama(model='llama3.1:8b', temperature=0.2)
+llm_conversational = ChatOllama(model='llama3.1:8b', temperature=0.7)
+memory_llm = ChatOllama(model='llama3.1:8b', temperature=0)  # For LTM extraction
 embeddings = OllamaEmbeddings(model="nomic-embed-text")
 
-# Initialize or load vector store
+# Initialize or load document vector store
 try:
     vector_store = FAISS.load_local(VECTOR_STORE_PATH, embeddings, allow_dangerous_deserialization=True)
 except Exception:
     vector_store = None
+
+# Initialize or load memory vector store for semantic search
+try:
+    memory_vector_store = FAISS.load_local(MEMORY_VECTOR_STORE_PATH, embeddings, allow_dangerous_deserialization=True)
+except Exception:
+    memory_vector_store = None
+
+
+# ==================== MEMORY VECTOR STORE HELPERS ====================
+
+def add_memory_to_vector_store(user_id: str, memory_id: str, memory_text: str):
+    """Add a memory to the FAISS vector store for semantic search"""
+    global memory_vector_store
+    
+    doc = Document(
+        page_content=memory_text,
+        metadata={"user_id": user_id, "memory_id": memory_id}
+    )
+    
+    if memory_vector_store is None:
+        memory_vector_store = FAISS.from_documents([doc], embeddings)
+    else:
+        memory_vector_store.add_documents([doc])
+    
+    # Save to disk
+    memory_vector_store.save_local(MEMORY_VECTOR_STORE_PATH)
+
+
+def search_memories(user_id: str, query: str, k: int = 3) -> List[Dict]:
+    """Search memories using semantic search, filtered by user_id"""
+    if memory_vector_store is None:
+        return []
+    
+    try:
+        # Search for top k*2 to allow filtering by user_id
+        docs_with_scores = memory_vector_store.similarity_search_with_score(query, k=k*3)
+        
+        # Filter by user_id and take top k
+        results = []
+        for doc, score in docs_with_scores:
+            if doc.metadata.get("user_id") == user_id and len(results) < k:
+                results.append({
+                    "text": doc.page_content,
+                    "memory_id": doc.metadata.get("memory_id"),
+                    "score": score
+                })
+        
+        return results
+    except Exception as e:
+        print(f"Memory search error: {e}")
+        return []
 
 
 # ==================== TOOLS ====================
@@ -252,25 +307,38 @@ class MemoryDecision(BaseModel):
 
 memory_extractor = memory_llm.with_structured_output(MemoryDecision)
 
-MEMORY_PROMPT = """Extract user information worth remembering long-term from the message below.
+MEMORY_PROMPT = """Extract key facts about the user from their message. Format as clean, direct statements.
 
 Current stored memories:
 {user_details_content}
 
-Rules:
-- Extract ONLY factual information: name, profession, interests, projects, preferences
-- Keep each memory as a single, clear sentence
-- Set is_new=true ONLY if this is genuinely NEW information not already stored
-- If information is similar to existing memory, set is_new=false
-- Ignore questions, greetings, or temporary statements
-- If nothing worth storing, set should_write=false
+**Formatting Rules:**
+- Name: "Name: [First Last]" (NOT "My name is..." or "User's name is...")
+- Profession: "Profession: [job title]" or "Works as: [job]"
+- Location: "Location: [place]" (NOT "Lives in...")
+- Interests: "Interest: [topic]" or "Learning: [subject]"
+- Preferences: "Prefers: [preference]" or "Uses: [tool/language]"
+- Projects: "Working on: [project description]"
 
-Examples:
-- "Hi, I'm Yaseen" → "Name: Yaseen" (is_new=true if not stored)
-- "I love Python" → "Prefers Python programming language" (is_new=true)
-- "How are you?" → Nothing to store (should_write=false)
-- "I work on AI" when "Works as AI engineer" exists → is_new=false
-"""
+**Examples:**
+User says: "Hi, I'm Yaseen Khan" → Store: "Name: Yaseen Khan" (is_new=true)
+User says: "I work on AI projects" → Store: "Working on: AI projects" (is_new=true)
+User says: "I live in Pakistan" → Store: "Location: Pakistan" (is_new=true)
+User says: "I prefer Python over JavaScript" → Store: "Prefers: Python for programming" (is_new=true)
+User says: "I'm learning machine learning" → Store: "Learning: Machine learning" (is_new=true)
+User says: "I post on LinkedIn about Agentic AI" → Store: "Interest: Agentic AI, Active on LinkedIn" (is_new=true)
+
+**Do NOT store:**
+- Greetings ("hi", "hello", "how are you")
+- Questions ("what is...", "can you help...")
+- Temporary states ("I'm tired", "that's interesting")
+- Opinions without context ("that's cool")
+
+**Deduplication:**
+- If similar info already exists, set is_new=false
+- If nothing new to store, set should_write=false
+
+Keep entries atomic, factual, and clean."""
 
 
 # ==================== STATE ====================
@@ -284,48 +352,49 @@ class ChatState(MessagesState):
 
 def get_system_prompt(user_context: str = "") -> str:
     """Generate system prompt with optional user context from LTM"""
-    base_prompt = """You are a helpful AI assistant. You have tools available, but you should use them RARELY — most requests do not need one.
+    base_prompt = """You're a helpful AI assistant. Be natural, friendly, and conversational.
 
-Before ever calling a tool, ask yourself: "Can I answer this directly from what I already know?" If yes, just answer directly. Only reach for a tool when direct knowledge genuinely cannot cover it."""
+**Response style:**
+- Keep it short and direct - don't over-explain
+- Sound human, not like a manual
+- Skip formalities unless greeting for first time
+- Don't mention tools, internal processes, or JSON structures
+- Answer confidently without unnecessary hedging
+
+**When you have user info:**
+- Use it naturally without calling it out
+- Don't say "Based on your profile..." or "I see that you..."
+- Just incorporate it smoothly into your response"""
     
     if user_context:
         base_prompt += f"\n\n{user_context}"
     
     base_prompt += """
 
-**Available Tools (use ONLY when clearly necessary):**
-- web_search: ONLY for information that changes over time and you could not know from training — breaking news, today's events, very recent releases/prices. NEVER use it for writing tasks, explanations, or general knowledge — you already know how to write an article, story, summary, or explanation about AI, history, science, etc. without searching for it.
-- calculator: ONLY for arithmetic you are not fully confident doing mentally.
-- get_stock_price: ONLY when the user explicitly asks for a current stock price.
-- search_documents: ONLY when the user's question is about content from a document they uploaded.
-- purchase_stock: ONLY when the user explicitly asks to buy/purchase shares.
+**Tool usage (only when actually needed):**
+- web_search: Current events, breaking news only
+- calculator: Complex math only
+- get_stock_price: When explicitly asked for stock prices
+- search_documents: Questions about uploaded docs
+- purchase_stock: When user wants to buy stocks
 
-**Do NOT use any tool for:**
-- Greetings, small talk, introductions ("hi", "who are you", "how's it going")
-- Writing requests: articles, essays, stories, poems, summaries, emails, code — write these yourself directly
-- Explaining concepts, definitions, how-to questions, general knowledge
-- Opinions, brainstorming, casual advice
-- Math you can do without a calculator
+**Never use tools for:**
+- General knowledge or explanations
+- Writing (articles, code, stories)
+- Casual conversation
+- Simple math
 
-**Guidelines:**
-- Use the user's name naturally in conversation when you know it
-- Reference their interests, projects, or preferences when relevant
-- Keep responses concise and conversational
-- Be helpful and direct
-
-**When genuinely unsure whether a tool is needed, default to NOT using one and answer directly.**
-- Read tool outputs carefully and extract the relevant information when you do use one
-- For stock purchases, wait for human approval before confirming"""
+Keep it natural and conversational."""
     
     return base_prompt
 
 
-def remember_node(state: ChatState, config: RunnableConfig, *, store: BaseStore):
-    """LTM node: Extract and store user information"""
+async def remember_node(state: ChatState, config: RunnableConfig, *, store: BaseStore):
+    """LTM node: Extract and store user information in PostgreSQL + FAISS"""
     user_id = config["configurable"].get("user_id", FIXED_USER_ID)
     ns = ("user", user_id, "details")
 
-    items = store.search(ns)
+    items = await store.asearch(ns)  # Use async search
     existing = "\n".join(it.value.get("data", "") for it in items) if items else "(empty)"
 
     last_message = state["messages"][-1]
@@ -334,7 +403,7 @@ def remember_node(state: ChatState, config: RunnableConfig, *, store: BaseStore)
 
     last_text = last_message.content
 
-    decision: MemoryDecision = memory_extractor.invoke(
+    decision: MemoryDecision = await memory_extractor.ainvoke(  # Use async invoke
         [
             SystemMessage(content=MEMORY_PROMPT.format(user_details_content=existing)),
             {"role": "user", "content": last_text},
@@ -344,43 +413,45 @@ def remember_node(state: ChatState, config: RunnableConfig, *, store: BaseStore)
     if decision.should_write:
         for mem in decision.memories:
             if mem.is_new and mem.text.strip():
-                store.put(ns, str(uuid.uuid4()), {"data": mem.text.strip()})
+                memory_id = str(uuid.uuid4())
+                memory_text = mem.text.strip()
+                
+                # Store in PostgreSQL for persistence
+                await store.aput(ns, memory_id, {"data": memory_text})
+                
+                # Store in FAISS for semantic search
+                add_memory_to_vector_store(user_id, memory_id, memory_text)
 
     return {}
 
 
-SYSTEM_PROMPT = """You are a helpful AI assistant. You have tools available, but you should use them RARELY — most requests do not need one.
+SYSTEM_PROMPT = """You're a helpful AI assistant. Be conversational and direct.
 
-Before ever calling a tool, ask yourself: "Can I answer this directly from what I already know?" If yes, just answer directly. Only reach for a tool when direct knowledge genuinely cannot cover it.
+**Tool philosophy:**
+Most questions don't need tools - answer from what you know. Only use tools when you genuinely cannot answer otherwise.
 
-**Available Tools (use ONLY when clearly necessary):**
-- web_search: ONLY for information that changes over time and you could not know from training — breaking news, today's events, very recent releases/prices. NEVER use it for writing tasks, explanations, or general knowledge — you already know how to write an article, story, summary, or explanation about AI, history, science, etc. without searching for it.
-- calculator: ONLY for arithmetic you are not fully confident doing mentally.
-- get_stock_price: ONLY when the user explicitly asks for a current stock price.
-- search_documents: ONLY when the user's question is about content from a document they uploaded.
-- purchase_stock: ONLY when the user explicitly asks to buy/purchase shares.
+**Use tools only when:**
+- web_search: Breaking news or very recent events you couldn't know
+- calculator: Complex arithmetic you can't do mentally
+- get_stock_price: User explicitly asks for current stock price
+- search_documents: Questions about uploaded documents
+- purchase_stock: User wants to buy shares
 
-**Do NOT use any tool for:**
-- Greetings, small talk, introductions ("hi", "who are you", "how's it going")
-- Writing requests: articles, essays, stories, poems, summaries, emails, code — write these yourself directly
-- Explaining concepts, definitions, how-to questions, general knowledge
-- Opinions, brainstorming, casual advice
-- Math you can do without a calculator
+**Never use tools for:**
+- Greetings, small talk ("hi", "how are you")
+- Writing tasks (articles, essays, code, summaries) - write these yourself
+- Explanations or general knowledge
+- Simple math
+- Casual conversation
 
 **Examples:**
-User: "Hi I am Yaseen" → respond directly, NO TOOLS
-User: "Write me a 200 word article on AI" → write it yourself directly, NO TOOLS — you already know about AI, no search needed
-User: "Explain how neural networks work" → respond directly, NO TOOLS
-User: "Tell me a joke" → respond directly, NO TOOLS
-User: "What's 25 * 47?" → calculator
-User: "Who wrote this paper?" (with a document uploaded) → search_documents
-User: "What's the price of Apple stock right now?" → get_stock_price
-User: "What happened in the news today?" → web_search
-User: "Buy me 10 shares of AAPL" → purchase_stock
+"Hi I am Yaseen" → Just respond naturally, NO TOOLS
+"Write an article on AI" → Write it yourself, NO TOOLS
+"What's 25 * 47?" → Use calculator
+"What's Apple stock price?" → Use get_stock_price
+"What's in the document?" → Use search_documents
 
-**When genuinely unsure whether a tool is needed, default to NOT using one and answer directly.**
-- Read tool outputs carefully and extract the relevant information when you do use one
-- For stock purchases, wait for human approval before confirming"""
+Keep responses natural, brief, and helpful."""
 
 
 async def _stream_and_merge(model, messages, config: RunnableConfig):
@@ -395,7 +466,7 @@ async def chat_node(state: ChatState, config: RunnableConfig, *, store: BaseStor
     """
     Main chat node with:
     - STM: Uses summary if available, keeps recent messages
-    - LTM: User context injection for personalization
+    - LTM: FAISS semantic search for top 3 relevant memories
     - Tool routing and streaming
     """
     messages = []
@@ -406,15 +477,24 @@ async def chat_node(state: ChatState, config: RunnableConfig, *, store: BaseStor
             content=f'Previous Conversation Summary:\n{state["summary"]}'
         ))
     
-    # LTM: Get user context
+    # LTM: Get relevant user context using FAISS semantic search (top 3)
     user_id = config["configurable"].get("user_id", FIXED_USER_ID)
-    ns = ("user", user_id, "details")
-    items = store.search(ns)
+    
+    # Get the last user message for semantic search query
+    last_user_msg = ""
+    for msg in reversed(state['messages']):
+        if isinstance(msg, HumanMessage):
+            last_user_msg = msg.content
+            break
     
     user_context = ""
-    if items:
-        user_details = "\n".join(f"- {it.value.get('data', '')}" for it in items)
-        user_context = f"**User Context (use naturally in conversation):**\n{user_details}\n"
+    if last_user_msg:
+        # Use FAISS semantic search to get top 3 relevant memories
+        relevant_memories = search_memories(user_id, last_user_msg, k=3)
+        
+        if relevant_memories:
+            user_details = "\n".join(f"- {mem['text']}" for mem in relevant_memories)
+            user_context = f"**Relevant User Info:**\n{user_details}\n"
     
     # Inject system prompt with user context
     system_prompt = get_system_prompt(user_context)
