@@ -81,18 +81,23 @@ Full Stack Web Developer & AI Automation Engineer
 * **Day 43:** Built frontend using Next.js and Tailwind CSS for the chatbot
 * **Day 44:** Fixed streaming pipeline end-to-end and resolved HITL approval detection bug
 
-### Phase 7: Memory Systems & Agent Intelligence (Days 45-49)
+### Phase 7: Memory Systems & Agent Intelligence (Days 45-50)
 **Objective:** Implement Short-Term and Long-Term Memory for personalized, context-aware agents
 
 * **Day 45:** Learned deeply about Memory in LLMs: Short-Term Memory (STM) and Long-Term Memory (LTM)
 * **Day 46:** Implemented Short-Term Memory (STM) in LangGraph with async PostgreSQL checkpointer, real-time streaming, and message trimming for context window management
 * **Day 47:** Added summarization and message deletion to the STM for efficient context management
 * **Day 48:** Implemented Long-Term Memory (LTM) in LangGraph with InMemoryStore, namespace-based memory isolation, semantic search using embeddings, and personalized context retrieval
-* **Day 49:** Advanced LTM implementation with PostgreSQL persistence, memory deduplication to prevent redundant storage, controlled memory writing with structured extraction, and terminal-based chatbot with optimized prompts for natural personalized responses
-* **Day 50:** Integrated Short-Term Memory (STM) and Long-Term Memory (LTM) into production chatbot: STM with message trimming for context window management, LTM with PostgreSQL persistence for user personalization, automatic memory extraction and deduplication, and unified FastAPI backend serving both memory systems
-* **Day 51:** Built automated technical blog writer using LangGraph map-reduce pattern with Send API for parallel section generation: v1 with basic planning and worker nodes, v2 with advanced structured planning (goal-oriented sections, concrete bullets, section types), technical writing prompts for developer-focused content, and automatic markdown file generation
-* **Day 52:** Enhanced production chatbot with semantic memory search and conversational AI improvements: implemented FAISS-based semantic search for LTM (retrieves top 3 relevant memories per query instead of exhaustive retrieval), improved memory extraction prompts for clean structured format ("Name: Yaseen Khan" vs "My name is Yaseen Khan"), streamlined system prompts to reduce robotic/verbose responses, added frontend filtering for technical JSON outputs, and created hybrid persistence architecture (PostgreSQL for durability + FAISS for semantic search)
-* **Day 53:** Built intelligent blog writer v3 with dynamic research capabilities: implemented router node with three modes (closed_book for evergreen topics, hybrid for topics needing fresh examples, open_book for news/volatile content), integrated Tavily search API for real-time web research with query generation and evidence synthesis, added citation system requiring URLs for factual claims in research-backed sections, enhanced structured planning with blog kinds (explainer, tutorial, news_roundup, comparison, system_design), improved task schema with flags (requires_research, requires_citations, requires_code), and built conditional routing with research bypass for evergreen content
+* **Day 49:** Advanced LTM with PostgreSQL persistence, memory deduplication, structured extraction, and terminal-based chatbot
+* **Day 50:** Integrated STM and LTM into production chatbot with PostgreSQL persistence and unified FastAPI backend
+
+### Phase 8: Advanced Content Generation (Days 51-54)
+**Objective:** Build intelligent content generation systems with research, citations, and visual assets
+
+* **Day 51:** Built automated technical blog writer using LangGraph map-reduce pattern with parallel section generation
+* **Day 52:** Enhanced chatbot with FAISS-based semantic memory search and hybrid persistence architecture
+* **Day 53:** Built intelligent blog writer v3 with dynamic research routing, Tavily search integration, and citation system
+* **Day 54:** Enhanced blog writer v4 with AI image generation using Gemini, subgraph-based reducer pipeline, and placeholder-based image injection
 
 ---
 
