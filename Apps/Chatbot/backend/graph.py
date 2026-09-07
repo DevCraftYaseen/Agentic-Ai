@@ -20,6 +20,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.graph.message import add_messages, RemoveMessage
 from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import interrupt, Command
 from langgraph.store.base import BaseStore
@@ -33,6 +34,9 @@ import requests
 from datetime import datetime
 
 load_dotenv()
+
+# Custom project name using code
+os.environ['LANGCHAIN_PROJECT'] = 'ChatBot Traces'
 
 # Configuration
 STOCK_API_KEY = os.getenv('STOCK_API_KEY')
