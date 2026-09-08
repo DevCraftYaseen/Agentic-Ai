@@ -5,18 +5,33 @@ Minimal LangGraph agent to confirm what LangSmith actually logs.
 Two nodes: a memory lookup, and a tool call. Run this once, then run
 inspect_trace.py to see the raw trace it produced -- no "reasoning"
 or "because" field anywhere, just inputs/outputs/metadata per step.
+
+Updated to use CodeCraft API for OpenAI models.
 """
 
 import os
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
-from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # Custom project name using code
 os.environ['LANGCHAIN_PROJECT'] = 'trace-demo'
+
+# --- CodeCraft API Configuration ----------------------------------------
+CODECRAFT_API_KEY = os.getenv("CODECRAFT_API_KEY")
+CODECRAFT_BASE_URL = os.getenv("CODECRAFT_BASE_URL", "https://codecraftapi.com/v1")
+CODECRAFT_MODEL = os.getenv("CODECRAFT_MODEL", "gpt-4o-mini")
+
+# Debug: Check if API key is loaded
+if not CODECRAFT_API_KEY or CODECRAFT_API_KEY == "cc_your_key_here":
+    print("⚠️  WARNING: CODECRAFT_API_KEY not set or using placeholder!")
+    print("   Please set your actual API key in .env file")
+else:
+    print(f"✓ CodeCraft API configured: {CODECRAFT_BASE_URL}")
+    print(f"✓ Using model: {CODECRAFT_MODEL}")
 
 # --- Fake "memory store" -----------------------------------------------
 # In your real project this would be your seeded ground-truth scenarios.
@@ -53,16 +68,30 @@ def send_email_tool(state: AgentState) -> AgentState:
 
 
 def generate_answer(state: AgentState) -> AgentState:
-    """Node 3: the only node that calls an LLM -- everything above is plain code."""
-    llm = ChatOllama(model="llama3.1:8b", temperature=0)
+    """Node 3: the only node that calls an LLM -- using CodeCraft API with OpenAI models."""
+    # Directly configure OpenAI client for CodeCraft API
+    from openai import OpenAI
+    
+    client = OpenAI(
+        api_key=CODECRAFT_API_KEY,
+        base_url=CODECRAFT_BASE_URL
+    )
+    
     prompt = (
         f"Query: {state['query']}\n"
         f"Retrieved memory: {state['retrieved_memory']}\n"
         f"Tool result: {state['tool_result']}\n"
         "Write one short sentence telling the user what happened."
     )
-    response = llm.invoke(prompt)
-    state["final_answer"] = response.content
+    
+    # Use OpenAI client directly
+    response = client.chat.completions.create(
+        model=CODECRAFT_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
+    )
+    
+    state["final_answer"] = response.choices[0].message.content
     return state
 
 

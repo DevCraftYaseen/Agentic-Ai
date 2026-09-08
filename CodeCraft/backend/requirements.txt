@@ -1,0 +1,20 @@
+fastapi==0.115.5
+uvicorn==0.32.1
+pydantic==2.10.3
+python-dotenv==1.0.1
+
+# LangChain & LangGraph
+langchain==0.3.11
+langchain-core==0.3.21
+langchain-community==0.3.11
+langgraph==0.2.59
+langgraph-checkpoint-sqlite==2.0.6
+
+# OpenAI (for CodeCraft API)
+openai==1.57.2
+
+# Database
+aiosqlite==0.20.0
+
+# Tools
+tavily-python==0.5.0
